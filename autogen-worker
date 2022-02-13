@@ -1,0 +1,21 @@
+#!/bin/bash
+iptoremsrc=$HOME/stb-mt-v1.0/iptoremote
+delwork1=/usr/local/src/.delwork1
+delwork2=/usr/local/src/.delwork2
+workerid=/usr/local/src/.workerid
+
+printf "Input jumlah STB untuk setiap RIG (default 7 STB/RIG) ? "
+read RIG 
+n=1
+for ip in `[ -f $iptoremsrc ] && cat $iptoremsrc | awk -F'.' '{print substr($4,0)}'`; do
+        echo "STB$n-IP$ip" >> $delwork1
+	n=$(( $n %$RIG + 1 ))
+done
+echo "Generating file.."
+sleep 1
+awk -v a=7 -v b=1 'c<a{print "RIG" b "-" $0; c+=1} c==a{c=0;b+=1}' $delwork1 > $delwork2
+sleep 1
+paste $iptoremsrc $delwork2 > $workerid
+sleep 1
+rm -f $delwork1 $delwork2
+echo "Done."

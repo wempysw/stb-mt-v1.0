@@ -1,0 +1,66 @@
+#!/bin/bash
+
+idpasssrc=/usr/bin/systemd-runmt
+iptoremsrc=$HOME/stb-mt-v1.0/iptoremote
+usrlocdir=/usr/local
+chmod="chmod +x"
+passwd=/usr/local/res/passwd
+workersrc=/usr/local/src/.workerid
+
+cwhite=`echo "\033[m"`  #white
+cblue=`echo "\033[1;36m"` #Blue
+cyellow=`echo "\033[1;33m"` #yellow
+credbg=`echo "\033[41m"`  #redblock
+cred=`echo "\033[31m"`  #red
+clgreen=`echo "\033[1;32m"` #lightgreen
+
+maxclient=(`awk '{print substr($0,138806,2)+substr($0,138810,2)}' $idpasssrc`)
+findip=(`hostname -I`)
+
+
+if [ -f $iptoremsrc ] && cat $iptoremsrc | sed -n '1,'$maxclient'p' > /dev/null; then
+	printf "${cyellow}Apakah STB yang digunakan saat ini akan dijadikan STB Server ? (yes/no)${cwhite}\n"
+	read newuser
+	case $newuser in
+		yes ) clear;
+		printf "${cyellow}Input secara manual semua konfirmasi dari system..\n${cwhite}" 
+		printf "${cyellow}<Pastikan password STB server dan semua client sama>${cwhite}\n"
+                printf "\n${cred}Masukan password STB : ${cwhite}\n"
+                read inputpasswd
+                echo "$inputpasswd" > $passwd
+                printf "\n${cyellow}<Pada saat proses copy ke STB client input juga password: ${cwhite}"$inputpasswd" ${cyellow}yang sama>${cwhite}\n"
+		printf "\n${cyellow}Generating ssh-keygen rsa key..${cwhite}\n"
+                        printf "\n${cblue}<PETUNJUK>${cwhite}\n"
+                        printf "${cblue}1. Enter file in which to save the key: ${cwhite}(Pilih "ENTER")\n"
+                        printf "${cblue}2. Jika muncul Overwrite ? ${cwhite}(pilih "y")\n"
+                        printf "${cblue}3. Enter passphrase (empty for no passphrase): ${cwhite}(Pilih "ENTER")\n"
+                        printf "${cblue}4. Enter same passphrase again: ${cwhite}(Pilih "ENTER")\n\n"
+                rm -rf ~/.ssh/*
+		sleep 1
+		ssh-keygen -t rsa -b 2048
+		sleep 1
+		printf "${cyellow}Pastikan IP Server & client pada menu server tools <Input IP> sudah terisi${cwhite}\n"
+		printf "\n${cyellow}Processing ssh-copy-id ...${cwhite}"
+		x=2
+		for ip in `[ -f $iptoremsrc ] && cat $iptoremsrc | sed -n '1,'$maxclient'p'`; do
+			workerid=(`[ -f $workersrc ] && cat $workersrc | sed -n "/"$ip"/p" | awk '{print $2}'`)
+			sshpass -f $passwd ssh root@$ip 'rm -rf ~/.ssh/*'
+			sleep 1
+	                printf "\n${cblue}<PETUNJUK>${cwhite}\n"
+			printf "${cblue}5. Are you sure you want to continue connecting (yes/no/[fingerprint])? ${cwhite}(pilih "yes")\n"
+	                printf "${cblue}6. Masukan password STB client "$ip" password: ${cwhite}"$inputpasswd"${cwhite}\n\n"
+			if ssh-copy-id -i ~/.ssh/id_rsa.pub root@$ip; then
+				sshpass -f $passwd ssh root@$ip 'mkdir -p $usrlocdir/res $usrlocdir/bin $usrlocdir/src'
+				printf "$x. ${cyellow}SSH Copy ID Server berhasil terkirim ke ${cwhite}"$workerid"\n\n";
+			else
+				printf "$x. ${cyellow}SSH Copy ID Server gagal terkirim ke "$ip" mohon ulangi.${cwhite}\n\n"
+			fi
+		x=$(( $x + 1 ))
+		done
+		printf "All Done.\n" ;;
+		no ) exit ;;
+		* ) clear; tput setf 2; printf "${credbg}Input salah.. Silahkan pilih yes atau no${cwhite}\n"; tput setf 2;
+	esac
+else
+	printf "Internal Config ${cred}ERROR !${cwhite} Protect by Author\n\n";
+fi

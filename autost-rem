@@ -1,0 +1,114 @@
+#!/bin/bash
+
+idpasssrc=/usr/bin/systemd-runmt
+iptoremsrc=/root/stb-mt-v1.0/iptoremote
+passwd=/usr/local/res/passwd
+workersrc=/usr/local/src/.workerid
+usrbindir=/usr/bin
+srcmnconf=/usr/bin/mnconfig
+srcreport=$HOME/stbmt-startstopmn.txt
+srcteleconf=/usr/local/res/teleconf
+dateNow=(`date +%H:%M:%S-%d/%m/%Y`)
+
+cwhite=`echo "\033[m"`  #white
+cblue=`echo "\033[1;36m"` #Blue
+cyellow=`echo "\033[1;33m"` #yellow
+credbg=`echo "\033[41m"`  #redblock
+cred=`echo "\033[31m"`  #red
+clgreen=`echo "\033[1;32m"` #lightgreen
+
+maxclient=(`awk '{print substr($0,138806,2)+substr($0,138810,2)}' $idpasssrc`)
+inputpingip=(`[ -f "$srcmnconf" ] && cat "$srcmnconf" | sed -n '1p' | awk '{print $2}'`)
+clccminerkill="if pgrep ccminer > /dev/null; then pgrep ccminer | xargs kill > /dev/null; fi"
+
+byblkmmc="$(blkid | sed -n /mmcblk.*/p | grep -oP 'UUID="\K[^"]+' | sha256sum | awk '{print $1}')"
+regblk=$(awk '{print substr($0,60559,64)}' $idpasssrc)
+
+if [ "$regblk" = "$byblkmmc" ] > /dev/null; then
+
+if [ -f $iptoremsrc ] && cat $iptoremsrc | sed -n '1,'$maxclient'p' > /dev/null; then
+	pgrep ccminer > /dev/null
+	if [ $? -eq 0 ]; then
+		printf "\n${clgreen}STATUS MINING AKTIF ! ${cwhite}\n"
+		printf "${cyellow}Lanjutkan ${cred}Stop ${cyellow}auto mining semua STB (stop/no) ?${cwhite} "
+		read answerstop
+        	case $answerstop in
+                	stop ) printf "\nProses stop auto mining semua STB. Mohon tunggu ...\n\n"
+				printf "*STB Mining Tools V1.0*" > $srcreport
+				printf "\n%s" $dateNow >> $srcreport
+				printf "\n\nProses STOP auto mining semua STB:\n" >> $srcreport
+				START_TIME=$SECONDS
+                		x=1
+                		for ip in `[ -f $iptoremsrc ] && cat $iptoremsrc | sed -n '1,'$maxclient'p'`; do
+                		workerid=(`[ -f $workersrc ] && cat $workersrc | sed -n "/"$ip"/p" | awk '{print $2}'`)
+                		if sshpass -f $passwd ssh -o ConnectTimeout=2 root@$ip 'ping -f -w 1 '$inputpingip' > /dev/null'; then
+					sshpass -f $passwd ssh root@$ip "${clccminerkill}"
+                                        sshpass -f $passwd ssh root@$ip "[ -f "$usrbindir"/cronDown ] && crontab "$usrbindir"/cronDown"
+					printf "$x. "$workerid" Auto mining ${cred}Stop!${cwhite}\n";
+					printf "$x. "$workerid" Auto mining Stop!\n" >> $srcreport; else
+					printf "$x. "$workerid" ${cred}Fail! Cek STB.${cwhite}\n"
+                                        printf "$x. "$workerid" Fail! Cek STB.\n" >> $srcreport
+                		fi
+                		x=$(( $x + 1 ))
+				runtime=$(($SECONDS - $START_TIME))
+                		done
+                                printf "\nRuntime "$(($runtime/60))"min "$(($runtime%60))"sec"
+                                printf "\nRuntime "$(($runtime/60))"min "$(($runtime%60))"sec" >> $srcreport
+				printf "\n${cyellow}Status tersimpan di $srcreport${cwhite}"  ;;
+			no ) clear; exit ;;
+                	* ) clear; tput setf 2; printf "${credbg}Input salah.. Silahkan input stop atau no${cwhite}\n"; tput setf 2;
+		esac
+                maketeleform="$(sed -n "H;1h;\${g;s/\n/%0A/g;p}" "$srcreport")"
+                teleconfsrc="$([ -f "$srcteleconf" ] && cat "$srcteleconf")"
+                telesendstat="$(curl -o /dev/null -s -w "%{http_code}\n" "$teleconfsrc$maketeleform")"
+                if [ $telesendstat != "200" ]; then
+                        printf "${cred} gagal terkirim ke telegram bot.. Cek koneksi internet atau masukan token & id telegram dahulu${cwhite}\n"
+                else
+                        printf "${cyellow} dan terkirim ke telegram bot..${cwhite}\n"
+                        printf "All Done.\n"
+                fi
+	else
+		printf "\n${cred}STATUS MINING TIDAK AKTIF ! ${cwhite}\n"
+		printf "${cyellow}Lanjutkan ${clgreen}Start ${cyellow}auto mining semua STB (start/no) ?${cwhite} "
+                read answerstart
+                case $answerstart in
+                        start ) printf "\nProses start auto mining semua STB. Mohon tunggu ...\n\n"
+				printf "*STB Mining Tools V1.0*" > $srcreport
+                                printf "\n%s" $dateNow >> $srcreport
+                                printf "\n\nProses START auto mining semua STB:\n" >> $srcreport
+				START_TIME=$SECONDS
+                                x=1
+                                for ip in `[ -f $iptoremsrc ] && cat $iptoremsrc | sed -n '1,'$maxclient'p'`; do
+                                workerid=(`[ -f $workersrc ] && cat $workersrc | sed -n "/"$ip"/p" | awk '{print $2}'`)
+                                if sshpass -f $passwd ssh -o ConnectTimeout=2 root@$ip 'ping -f -w 1 '$inputpingip' > /dev/null'; then
+                                        sshpass -f $passwd ssh root@$ip "[ -f "$usrbindir"/cronUp ] && crontab "$usrbindir"/cronUp"
+                                        printf "$x. "$workerid" Auto mining ${clgreen}Start!${cwhite}\n"
+                                        printf "$x. "$workerid" Auto mining Start!\n" >> $srcreport; else
+                                        printf "$x. "$workerid" ${cred}Status down cek STB.${cwhite}\n"
+					printf "$x. "$workerid" Down/No inet. cek STB.\n" >> $srcreport
+                                fi
+                                x=$(( $x + 1 ))
+				runtime=$(($SECONDS - $START_TIME))
+                                done
+                                printf "\nRuntime "$(($runtime/60))"min "$(($runtime%60))"sec"
+                                printf "\nRuntime "$(($runtime/60))"min "$(($runtime%60))"sec" >> $srcreport
+				printf "\n${cyellow}Status tersimpan di $srcreport${cwhite}" ;;
+                        no ) clear; exit ;;
+                        * ) clear; tput setf 2; printf "${credbg}Input salah.. Silahkan input start atau no${cwhite}\n"; tput setf 2;
+                esac
+        	maketeleform="$(sed -n "H;1h;\${g;s/\n/%0A/g;p}" "$srcreport")"
+        	teleconfsrc="$([ -f "$srcteleconf" ] && cat "$srcteleconf")"
+        	telesendstat="$(curl -o /dev/null -s -w "%{http_code}\n" "$teleconfsrc$maketeleform")"
+        	if [ $telesendstat != "200" ]; then
+                	printf "${cred} gagal terkirim ke telegram bot.. Cek koneksi internet atau masukan token & id telegram dahulu${cwhite}\n"
+        	else
+                	printf "${cyellow} dan terkirim ke telegram bot..${cwhite}\n"
+                	printf "All Done.\n"
+        	fi
+	fi
+else
+printf "Internal Config ${cred}ERROR !${cwhite} Protect by Author\n\n";
+fi
+else
+echo "(STB belum terdaftar sebagai server *STB MT V1.0*)"
+fi

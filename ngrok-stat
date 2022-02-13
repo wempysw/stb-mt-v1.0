@@ -1,0 +1,20 @@
+#!/bin/bash
+
+srcmnconf=/usr/bin/mnconfig
+srcteleconf=/usr/local/res/teleconf
+dateNow="$(date +%H:%M:%S-%d/%m/%Y)"
+
+currping_ip=`[ -f $srcmnconf ] && cat $srcmnconf | sed -n '/ping_ip/p' | awk '{print $2}'`
+if ping -c2 $currping_ip; then
+	if ! pidof ngrok; then
+		/srv/ngrok tcp 22 > /dev/null &
+		disown
+		sleep 30
+		teleconf="$([ -f "$srcteleconf" ] && cat "$srcteleconf")"
+		ngrokhost="$(curl http://localhost:4040/api/tunnels | awk -F'","proto' '{print substr($1,90)}')"
+		curl ""$teleconf"*STB Mining Tools V1.0*%0A"$dateNow"%0A%0AUpdate ngrok:%0AHostname:Port%0A"${ngrokhost}""
+	fi
+else
+	pgrep ngrok | xargs kill
+fi
+exit
