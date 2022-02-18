@@ -3,9 +3,9 @@ STB Mining Tools V1.0
 
 Syarat install:
 -Login root
--semua password root sama
+-semua password root wajib sama
 -IP & MAC wajib Static
--Jaringan pada eth0 LAN atau kabel (bukan wireless!)
+-Jaringan pada eth0 LAN atau kabel (bukan wireless atau wlan0!)
 
 Fitur stb-mt-v1.0 :
 1. Ganti wallet Luckpool dan Zergpool dari server.
